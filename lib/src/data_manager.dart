@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:base_core/base_core.dart';
+import 'package:base_core/src/streaming_use_case_manager.dart';
+import 'package:base_core/src/use_case_executor.dart';
 import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
-import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
 
 typedef DataListener<T> = void Function(T);
@@ -13,61 +14,63 @@ typedef MapStreamFn<T> = Stream<T> Function(T);
 typedef UseCaseMapFn<D, P> = D Function(D, P);
 typedef StreamingUseCaseMapFn<D, P> = D Function(D, P);
 
-extension<T> on Stream<T> {
-  Stream<T> optionalAsyncMap(AsyncMapFn<T>? fn) {
-    if (fn != null) {
-      return this.asyncMap(fn);
-    } else {
-      return this;
-    }
-  }
-
-  Stream<T> optionalMap(MapStreamFn<T>? fn) {
-    if (fn != null) {
-      return this.switchMap(fn);
-    } else {
-      return this;
-    }
-  }
-
-  Stream<T> optionallyNotifyListeners(
-    ObserverList<DataListener<T>>? listeners,
-  ) {
-    if (listeners != null && listeners.isNotEmpty) {
-      return this.doOnData((event) {
-        listeners.forEach((fn) => fn(event));
-      });
-    } else {
-      return this;
-    }
-  }
-}
-
-/// [D] data being managed
+/// A generic data manager that handles state management and use case execution
+///
+/// Type Parameters:
+/// * [D] - The type of data being managed. Must be non-nullable.
 abstract class DataManager<D> {
   @protected
-  late Logger logger;
+  late final Logger logger;
 
+  late final UseCaseExecutor<D> _useCaseExecutor;
+  late final StreamingUseCaseManager<D> _streamingManager;
+  late final PublishSubject<Failure> _onFailure;
+  late final ActivityIndicator _activityIndicator;
+  late final CompositeSubscription compositeSubscription;
+
+  int maxRetries;
+
+  /// Creates a new DataManager instance
+  ///
+  /// Parameters:
+  /// * [useCaseGen] - Generator containing all available use cases
+  /// * [initData] - Optional initial data value
+  /// * [autoClearFns] - Whether to clear async functions after execution
+  ///
+  /// Throws:
+  /// * [ArgumentError] if [useCaseGen] is null
   DataManager(
     UseCaseGenerator<D> useCaseGen, {
     D? initData,
     this.autoClearFns = true,
+    this.maxRetries = 3,
   })  : rx = initData != null
             ? BehaviorSubject<D>.seeded(initData)
             : BehaviorSubject<D>(),
         useCases = useCaseGen.useCases,
         streamingUseCases = useCaseGen.streamingUseCases {
-    logger = Logger(runtimeType.toString());
+    logger = BaseCoreLogger.instance.logger;
+    _onFailure = PublishSubject<Failure>();
+    _activityIndicator = ActivityIndicator();
+
+    _useCaseExecutor = UseCaseExecutor(
+      _activityIndicator,
+      _onFailure,
+      rx,
+      logger,
+      _handleOnDone,
+      _listeners,
+      asyncMapFn,
+      mapStreamFn,
+    );
   }
 
   final bool autoClearFns;
-  final _onFailure = PublishSubject<Failure>();
+
   final _runUseCase = PublishSubject<
       Tuple2<Trampoline<Stream<Either<Failure, dynamic>>>,
           UseCaseMapFn<D, dynamic>?>>();
-  final activityIndicator = ActivityIndicator();
   final onDone = PublishSubject();
-  late CompositeSubscription compositeSubscription;
 
   Future<void> get waitDone => onDone.first;
   ObserverList<DataListener<D>> _listeners = ObserverList<DataListener<D>>();
@@ -76,8 +79,18 @@ abstract class DataManager<D> {
   MapStreamFn<D>? mapStreamFn;
 
   void registerSubscription(CompositeSubscription subscription) {
+    logger.t('registerSubscription');
     compositeSubscription = subscription;
-    subscriber.addTo(compositeSubscription);
+    _useCaseExecutor.subscription.addTo(compositeSubscription);
+
+    _streamingManager = StreamingUseCaseManager(
+      compositeSubscription,
+      _onFailure,
+      rx,
+      logger,
+    );
+
+    _setupRetryMechanism();
   }
 
   final BehaviorSubject<D> rx;
@@ -92,21 +105,8 @@ abstract class DataManager<D> {
           Tuple2<StreamingUseCase<dynamic, dynamic>, UseCaseMapFn<D, dynamic>?>>
       streamingUseCases;
 
-  Stream<bool> get isLoading => activityIndicator.stream;
+  Stream<bool> get isLoading => _activityIndicator.stream;
   Stream<Failure> get onFailure => _onFailure.stream;
-
-  StreamSubscription get subscriber => _runUseCase
-      .whereNotLoading(activityIndicator)
-      .switchMap((t) => t.value1
-          .run()
-          .map((e) => e.map((d) => d is D ? d : t.value2!.call(value!, d)))
-          .trackActivity(activityIndicator)
-          .onFailureForwardTo(_onFailure)
-          .optionalAsyncMap(asyncMapFn)
-          .optionalMap(mapStreamFn)
-          .optionallyNotifyListeners(_listeners)
-          .doOnDone(_handleOnDone))
-      .listen(rx.add);
 
   void _handleOnDone() {
     if (autoClearFns) {
@@ -116,22 +116,92 @@ abstract class DataManager<D> {
     onDone.add(null);
   }
 
-  void runUseCase<U, P>(P params) {
-    final tuple = useCases[U];
-    final useCase = tuple!.value1;
-    final mapFn = tuple.value2;
+  /// Sets up automatic retry mechanism for failed operations
+  void _setupRetryMechanism() {
+    var retryCount = 0;
+    _onFailure
+        .where((failure) => failure is RetryableFailure)
+        .asyncMap((failure) async {
+      await Future.delayed((failure as RetryableFailure).delay);
+      return failure;
+    }).listen((failure) {
+      final tuple = useCases[failure.useCase];
+      var useCase = tuple?.value1;
+      _retry() {
+        logger.d('RetryableFailure: ${failure}, ${retryCount}');
+        if (retryCount < maxRetries) {
+          retryCount++;
+          logger.t('Retrying operation (${retryCount}/${maxRetries})');
+          // Re-run the last use case
 
-    Trampoline<Stream<Either<Failure, dynamic>>> runningUseCase;
+          // Get the use case from the stored type
 
-    if (useCase is DataManagerUseCase) {
-      runningUseCase = useCase.tStream(tuple2<P, D>(params, value));
-    } else {
-      runningUseCase = useCase.tStream(params);
-    }
-    _runUseCase.add(tuple2(runningUseCase, mapFn));
+          if (tuple != null) {
+            useCase = tuple.value1;
+            final mapFn = tuple.value2;
+
+            // Execute the use case directly through the executor
+            _useCaseExecutor.runUseCase(
+              useCase,
+              failure.params,
+              mapFn,
+            );
+          }
+        } else {
+          logger.d('Max retries reached for use case ${useCase}');
+          retryCount = 0;
+        }
+      }
+
+      _retry();
+    });
   }
 
-  final Map<StreamingUseCase, StreamSubscription<D>> runningUseCaseStreams = {};
+  /// Runs a use case with validation and error handling
+  ///
+  /// Type Parameters:
+  /// * [U] - The type of use case to run
+  /// * [P] - The type of parameters for the use case
+  ///
+  /// Throws:
+  /// * [StateError] if the use case is not registered
+  /// * [ArgumentError] if required parameters are missing
+  void runUseCase<U, P>(P params) {
+    final tuple = useCases[U];
+    if (tuple == null) {
+      throw StateError('UseCase of type $U not registered');
+    }
+
+    final useCase = tuple.value1;
+    final mapFn = tuple.value2;
+
+    try {
+      _validateParams<U, P>(params);
+      _useCaseExecutor.runUseCase(useCase, params, mapFn);
+    } catch (e, stack) {
+      logger.e('Error running use case', error: e, stackTrace: stack);
+      _onFailure.add(UnexpectedFailure(e.toString()));
+    }
+  }
+
+  /// Validates parameters for a specific use case
+  void _validateParams<U, P>(P params) {
+    if (params == null && !_isNullableParam<P>()) {
+      throw ArgumentError('Non-nullable parameters required for UseCase $U');
+    }
+  }
+
+  bool _isNullableParam<P>() {
+    return null is P;
+  }
+
+  void dispose() {
+    _useCaseExecutor.dispose();
+    rx.close();
+    _onFailure.close();
+    _activityIndicator.close();
+    compositeSubscription.dispose();
+  }
 
   void registerStreamingUseCase<U, P>(P params) {
     final tuple = streamingUseCases[U];
@@ -139,32 +209,14 @@ abstract class DataManager<D> {
     final useCase = tuple!.value1;
     final mapFn = tuple.value2;
 
-    if (runningUseCaseStreams.containsKey(useCase)) {
-      logger.fine('Cannot register same stream twice');
-      return;
-    }
-
-    final ss = useCase(useCase is DataManagerStreamingUseCase
-            ? tuple2<P, BehaviorSubject<D>>(params, rx)
-            : params)
-        .onFailureForwardTo(_onFailure)
-        .map((d) => d is D ? d : mapFn!.call(value, d))
-        .listen(update);
-
-    compositeSubscription.add(ss);
-    runningUseCaseStreams.putIfAbsent(useCase, () => ss);
+    _streamingManager.register(useCase, params, mapFn);
   }
 
   void deRegisterUseCase<U>() {
     final tuple = streamingUseCases[U];
     final useCase = tuple!.value1;
 
-    final ss = runningUseCaseStreams[useCase];
-
-    if (ss != null) {
-      compositeSubscription.remove(ss);
-      runningUseCaseStreams.remove(useCase);
-    }
+    _streamingManager.deregister(useCase);
   }
 
   void update(D data) {
@@ -184,6 +236,6 @@ abstract class DataManager<D> {
     rx.close();
     _onFailure.close();
     _runUseCase.close();
-    activityIndicator.close();
+    _activityIndicator.close();
   }
 }

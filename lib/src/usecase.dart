@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:base_core/src/failure.dart';
+import 'package:base_core/base_core.dart';
 import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
-import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
 
 abstract class StreamingUseCase<P, R> {
@@ -11,7 +10,7 @@ abstract class StreamingUseCase<P, R> {
   late Logger logger;
 
   StreamingUseCase() {
-    logger = Logger(runtimeType.toString());
+    logger = BaseCoreLogger.instance.logger;
   }
 
   Either<Failure, R> onError(Object object, StackTrace stackTrace);
@@ -27,7 +26,7 @@ abstract class UseCase<P, R> {
   late Logger logger;
 
   UseCase() {
-    logger = Logger(runtimeType.toString());
+    logger = BaseCoreLogger.instance.logger;
   }
 
   Future<Either<Failure, R>> execute(P params);
@@ -43,11 +42,18 @@ abstract class UseCase<P, R> {
   }
 }
 
+// abstract class RetryableUseCase<P, R> extends UseCase<P, R> {
+//   int retries = 0;
+//   int maxRetries = 3;
+//   Duration delay = Duration.zero;
+// }
+
 // A Usecase to be use inside a data manager
-@mustCallSuper
+
 abstract class DataManagerUseCase<P, R> extends UseCase<Tuple2<P, R>, R> {
   late Tuple2<P, R> _params;
 
+  @mustCallSuper
   void params(Tuple2<P, R> params) {
     _params = params;
   }
@@ -56,11 +62,18 @@ abstract class DataManagerUseCase<P, R> extends UseCase<Tuple2<P, R>, R> {
   R get value => _params.value2;
 }
 
-@mustCallSuper
+// abstract class DataManagerRetryableUseCase<P, R>
+//     extends DataManagerUseCase<P, R> {
+//   int retries = 0;
+//   int maxRetries = 3;
+//   Duration delay = Duration.zero;
+// }
+
 abstract class DataManagerStreamingUseCase<P, R>
     extends StreamingUseCase<Tuple2<P, BehaviorSubject<R>>, R> {
   late Tuple2<P, BehaviorSubject<R>> _params;
 
+  @mustCallSuper
   void params(Tuple2<P, BehaviorSubject<R>> params) {
     _params = params;
   }

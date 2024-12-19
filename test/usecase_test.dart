@@ -14,7 +14,9 @@ class TestUseCase extends UseCase<String?, int> {
     }
     try {
       final res = await Future.delayed(
-          Duration(milliseconds: 500), () => int.parse(params));
+        Duration(milliseconds: 500),
+        () => int.parse(params),
+      );
 
       return right(res);
     } catch (e) {

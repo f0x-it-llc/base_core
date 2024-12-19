@@ -14,14 +14,9 @@ import 'test_classes/user_usecase_generator.dart';
 void main() {
   final subscription = CompositeSubscription();
   final userManager = UserDataManager(UserUseCaseGenerator());
-
-  BaseCoreLogger.initLogging();
+  userManager.registerSubscription(subscription);
 
   group('Test DataManager', () {
-    setUp(() {
-      userManager.registerSubscription(subscription);
-    });
-
     test('Should emit expected data', () async {
       final subscription = userManager.stream.listen(expectAsync1((event) {
         expect(event.runtimeType, User);
@@ -97,11 +92,17 @@ void main() {
 
       userManager.registerAgeStream(params);
       await Future.delayed(
-          Duration(milliseconds: params.milliseconds * numberOfEmits));
+        Duration(milliseconds: params.milliseconds * numberOfEmits),
+      );
     });
 
-    tearDown(() {
-      subscription.clear();
+    test('Should retry use case', () async {
+      userManager.retryUser();
+
+      await userManager.waitDone;
+      await Future.delayed(Duration(milliseconds: 8000));
+
+      // TODO: Test if the use case is retried
     });
   });
 }

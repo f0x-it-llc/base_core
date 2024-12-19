@@ -5,7 +5,10 @@ class ValueStreamBuilder<T> extends StatelessWidget {
   final ValueStream<T> stream;
   final AsyncWidgetBuilder<T> builder;
 
-  ValueStreamBuilder({required this.stream, required this.builder});
+  ValueStreamBuilder({
+    required this.stream,
+    required this.builder,
+  });
 
   @override
   Widget build(BuildContext context) {

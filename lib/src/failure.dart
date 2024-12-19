@@ -12,3 +12,21 @@ extension OnFailures<T> on Stream<T> {
     });
   }
 }
+
+class RetryableFailure extends Failure {
+  final dynamic params;
+  final Type useCase;
+  final Duration delay;
+
+  RetryableFailure({
+    required this.params,
+    required this.useCase,
+    String? message,
+    this.delay = Duration.zero,
+  }) : super(message);
+}
+
+/// Represents an unexpected failure
+class UnexpectedFailure extends Failure {
+  UnexpectedFailure(String message) : super(message);
+}

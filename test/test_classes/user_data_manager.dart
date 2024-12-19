@@ -2,6 +2,7 @@ import 'package:base_core/src/data_manager.dart';
 
 import 'usecases/get_user_usecase.dart';
 import 'usecases/get_users_ages.dart';
+import 'usecases/retryable_usecase.dart';
 import 'usecases/stream_user_age_usecase.dart';
 import 'usecases/update_user_usecase.dart';
 import 'user_model.dart';
@@ -29,6 +30,10 @@ class UserDataManager extends DataManager<User> {
 
   void deRegisterAgeStream() {
     deRegisterUseCase<StreamUserAgeUseCase>();
+  }
+
+  void retryUser() {
+    runUseCase<RetryableUseCase, bool>(true);
   }
 
   @override

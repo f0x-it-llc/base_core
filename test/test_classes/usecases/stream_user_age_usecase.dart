@@ -24,13 +24,15 @@ class StreamUserAgeUseCase extends DataManagerStreamingUseCase<
       Tuple2<TestingStreamUserAgeUseCaseParams, BehaviorSubject<User>> param) {
     super.params(param);
 
-    return Stream.periodic(Duration(milliseconds: param.value1.milliseconds),
-        (_) {
-      final current = value.value;
+    return Stream.periodic(
+      Duration(milliseconds: param.value1.milliseconds),
+      (_) {
+        final current = value.value;
 
-      final updatedAge = User.age.get(current) + 1;
+        final updatedAge = User.age.get(current) + 1;
 
-      return right(User.age.set(current, updatedAge));
-    });
+        return right(User.age.set(current, updatedAge));
+      },
+    );
   }
 }

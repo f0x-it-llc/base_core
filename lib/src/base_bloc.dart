@@ -1,24 +1,26 @@
 import 'dart:async';
 
-import 'package:base_core/src/failure.dart';
+import 'package:base_core/base_core.dart';
 import 'package:dartz/dartz.dart' show Either;
 import 'package:flutter/widgets.dart';
-import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
+
+typedef BlocBuilder<T> = T Function();
+typedef BlocDisposer<T> = Function(T);
 
 abstract class BaseBloc {
   @protected
   late Logger logger;
 
   BaseBloc() {
-    logger = Logger(runtimeType.toString());
-    logger.finest('init');
+    logger = BaseCoreLogger.instance.logger;
+    logger.d('init');
   }
 
   CompositeSubscription compositeSubscription = CompositeSubscription();
 
   void dispose() {
-    logger.finest('dispose');
+    logger.d('dispose');
     compositeSubscription.dispose();
   }
 }
@@ -26,15 +28,15 @@ abstract class BaseBloc {
 abstract class BaseState<T extends StatefulWidget> extends State<T> {
   late Logger logger;
   BaseState() {
-    logger = Logger('${runtimeType.toString()}');
-    logger.finest('init');
+    logger = BaseCoreLogger.instance.logger;
+    logger.d('init');
   }
 
   CompositeSubscription compositeSubscription = CompositeSubscription();
 
   @override
   void dispose() {
-    logger.finest('dispose');
+    logger.d('dispose');
     compositeSubscription.dispose();
     super.dispose();
   }
@@ -59,55 +61,64 @@ class MultiBlocProvider extends StatelessWidget {
 }
 
 class SingleBlocProvider<T extends BaseBloc> {
-  final T bloc;
+  final BlocBuilder<T> blocBuilder;
+  final BlocDisposer<T>? blocDispose;
 
-  SingleBlocProvider(this.bloc);
+  SingleBlocProvider(this.blocBuilder, {this.blocDispose});
 
   BlocProvider<T> makeBlocProvider(Widget child) {
     return BlocProvider<T>(
-      bloc: bloc,
+      blocBuilder: blocBuilder,
+      blocDisposer: blocDispose,
       child: child,
     );
   }
 }
 
 class BlocProvider<T extends BaseBloc> extends StatefulWidget {
-  BlocProvider({
-    Key? key,
+  const BlocProvider({
+    super.key,
     required this.child,
-    this.shouldDispose = true,
-    required this.bloc,
-  }) : super(key: key);
+    required this.blocBuilder,
+    this.blocDisposer,
+  });
 
   final Widget child;
-  final T bloc;
-  final bool shouldDispose;
+  final BlocBuilder<T> blocBuilder;
+  final BlocDisposer<T>? blocDisposer;
 
   @override
   _BlocProviderState<T> createState() => _BlocProviderState<T>();
 
   static T? of<T extends BaseBloc>(BuildContext context) {
-    _BlocProviderInherited<T> provider = context
-        .getElementForInheritedWidgetOfExactType<_BlocProviderInherited<T>>()
-        ?.widget as _BlocProviderInherited<T>;
+    final InheritedElement? inheritedElement = context
+        .getElementForInheritedWidgetOfExactType<_BlocProviderInherited<T>>();
+    if (inheritedElement == null) {
+      return null;
+    }
 
-    return provider.bloc;
-  }
+    final _BlocProviderInherited<T>? provider =
+        inheritedElement.widget as _BlocProviderInherited<T>?;
 
-  BlocProvider<T> copyWithChild(Widget child) {
-    return BlocProvider<T>(
-      bloc: bloc,
-      child: child,
-      key: key,
-    );
+    return provider?.bloc;
   }
 }
 
 class _BlocProviderState<T extends BaseBloc> extends State<BlocProvider<T>> {
+  late T bloc;
+
+  @override
+  void initState() {
+    super.initState();
+    bloc = widget.blocBuilder();
+  }
+
   @override
   void dispose() {
-    if (widget.shouldDispose) {
-      widget.bloc.dispose();
+    if (widget.blocDisposer != null) {
+      widget.blocDisposer?.call(bloc);
+    } else {
+      bloc.dispose();
     }
     super.dispose();
   }
@@ -115,23 +126,23 @@ class _BlocProviderState<T extends BaseBloc> extends State<BlocProvider<T>> {
   @override
   Widget build(BuildContext context) {
     return _BlocProviderInherited<T>(
-      bloc: widget.bloc,
+      bloc: bloc,
       child: widget.child,
     );
   }
 }
 
-class _BlocProviderInherited<T> extends InheritedWidget {
-  _BlocProviderInherited({
+class _BlocProviderInherited<T extends BaseBloc> extends InheritedWidget {
+  const _BlocProviderInherited({
     Key? key,
     required Widget child,
     required this.bloc,
   }) : super(key: key, child: child);
 
-  final T? bloc;
+  final T bloc;
 
   @override
-  bool updateShouldNotify(_BlocProviderInherited oldWidget) => false;
+  bool updateShouldNotify(_BlocProviderInherited<T> oldWidget) => false;
 }
 
 extension ForwardFailure<T> on Stream<Either<Failure, T>> {

@@ -1,11 +1,27 @@
-import 'package:logging/logging.dart';
+import 'package:logger/logger.dart';
+
+export 'package:logger/logger.dart';
 
 class BaseCoreLogger {
-  static initLogging() {
-    Logger.root.level = Level.ALL;
-    Logger.root.onRecord.listen((rec) {
-      print(
-          '${rec.loggerName} - ${rec.level.name}: ${rec.time}: ${rec.message}');
-    });
+  static final BaseCoreLogger _singleton = BaseCoreLogger._internal();
+
+  Logger? _logger;
+
+  Logger get logger => _logger ??= Logger();
+
+  BaseCoreLogger._internal();
+
+  static BaseCoreLogger get instance => _singleton;
+
+  void init({
+    LogFilter? filter,
+    LogPrinter? printer,
+    LogOutput? output,
+  }) {
+    _logger = Logger(
+      filter: filter,
+      printer: printer,
+      output: output,
+    );
   }
 }

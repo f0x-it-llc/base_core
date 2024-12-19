@@ -17,7 +17,11 @@ class SomeWidget extends StatelessWidget {
 class BlocWrappingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(child: SomeWidget(), bloc: SomeBloc());
+    return BlocProvider(
+      child: SomeWidget(),
+      blocBuilder: () => SomeBloc(),
+      blocDisposer: (bloc) => bloc.dispose(),
+    );
   }
 }
 
