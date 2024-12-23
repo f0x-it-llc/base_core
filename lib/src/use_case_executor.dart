@@ -83,7 +83,7 @@ class UseCaseExecutor<D> {
     logger.t('runUseCase $U with params $params');
 
     if (useCase is DataManagerUseCase) {
-      runningUseCase = (useCase as DataManagerUseCase<P, D>).tStream(
+      runningUseCase = useCase.tStream(
         tuple2<P, D>(params, rx.value),
       );
     } else if (useCase is UseCase) {
