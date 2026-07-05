@@ -26,6 +26,10 @@ class MemberDetailController extends Controller {
 
   /// Renames the member. Returns true on success so the UI can close the
   /// edit sheet; failures (validation, network) surface on [failures].
+  ///
+  /// This controller is screen-scoped (factory-registered, disposed by the
+  /// page), so it can be disposed while the rename is in flight — every
+  /// signal write after the `await` is guarded with [isDisposed].
   Future<bool> rename(String name) async {
     saving.value = true;
     try {
@@ -36,13 +40,13 @@ class MemberDetailController extends Controller {
       );
       return result.fold(
         onSuccess: (updated) {
-          member.value = AsyncState.data(updated);
+          if (!isDisposed) member.value = AsyncState.data(updated);
           return true;
         },
         onFailure: (_) => false,
       );
     } finally {
-      saving.value = false;
+      if (!isDisposed) saving.value = false;
     }
   }
 }

@@ -9,6 +9,7 @@ class ActivityTracker {
   ActivityTracker();
 
   final Signal<int> _count = signal(0);
+  bool _disposed = false;
 
   /// Number of operations currently in flight.
   late final ReadonlySignal<int> pending = _count.readonly();
@@ -17,16 +18,22 @@ class ActivityTracker {
   late final ReadonlySignal<bool> isLoading = computed(() => _count.value > 0);
 
   /// Runs [operation], keeping [isLoading] `true` for its duration.
+  ///
+  /// Counter updates are skipped once [dispose] has run, so an operation
+  /// still in flight when the tracker is torn down completes without
+  /// writing to a disposed signal.
   Future<T> track<T>(Future<T> Function() operation) async {
-    _count.value++;
+    if (!_disposed) _count.value++;
     try {
       return await operation();
     } finally {
-      _count.value--;
+      if (!_disposed) _count.value--;
     }
   }
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     isLoading.dispose();
     _count.dispose();
   }

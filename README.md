@@ -116,6 +116,7 @@ What the base class provides:
 | `failures` | Broadcast `Stream<Failure>` of every unhandled failure (after retries). |
 | `autoEffect(fn)` | A signals `effect` cleaned up on dispose. |
 | `onDispose(fn)` | Register any cleanup; run in reverse order by `dispose()`. |
+| `isDisposed` | `true` once `dispose()` has run. Guard writes to plain signals that follow an `await` (`if (isDisposed) return;`) — `runInto`/`watch` guard their own writes already. |
 
 ### RetryPolicy
 

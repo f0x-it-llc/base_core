@@ -47,6 +47,21 @@ void main() {
       expect(await tracker.track(() async => 7), 7);
       tracker.dispose();
     });
+
+    test('an operation in flight during dispose completes without writing '
+        'to the disposed counter', () async {
+      final tracker = ActivityTracker();
+      final gate = Completer<void>();
+
+      final pending = tracker.track(() async {
+        await gate.future;
+        return 7;
+      });
+
+      tracker.dispose();
+      gate.complete();
+      expect(await pending, 7);
+    });
   });
 
   group('RetryPolicy', () {
