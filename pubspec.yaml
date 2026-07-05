@@ -1,10 +1,17 @@
-name: base_core
+name: clean_signals
 description: >-
   A lightweight use-case and controller framework for signals-based Flutter
   and Dart applications. Typed results, sealed failures, ref-counted activity
   tracking and declarative retries — without rxdart or dartz.
 version: 2.0.0
-homepage: https://github.com/f0x-it-llc/base_core
+homepage: https://github.com/f0x-it-llc/clean_signals
+repository: https://github.com/f0x-it-llc/clean_signals
+topics:
+  - state-management
+  - clean-architecture
+  - signals
+  - usecase
+  - result
 
 environment:
   sdk: ^3.5.0

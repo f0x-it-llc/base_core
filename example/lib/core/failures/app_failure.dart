@@ -1,4 +1,4 @@
-import 'package:base_core/base_core.dart';
+import 'package:clean_signals/clean_signals.dart';
 
 /// Root of the app's failure hierarchy.
 ///
@@ -38,7 +38,7 @@ final class ValidationFailure extends AppFailure {
   String get userMessage => message!;
 }
 
-/// Maps any [Failure] (including base_core's [UnexpectedFailure]) to a
+/// Maps any [Failure] (including clean_signals's [UnexpectedFailure]) to a
 /// message suitable for a snackbar.
 extension FailureMessage on Failure {
   String get userMessage => switch (this) {

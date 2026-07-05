@@ -1,6 +1,6 @@
 name: team_directory
 description: >-
-  Sample app showcasing clean architecture with base_core v2 and signals.
+  Sample app showcasing clean architecture with clean_signals v2 and signals.
 publish_to: none
 version: 1.0.0
 
@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  base_core:
+  clean_signals:
     path: ../
   signals: ^7.0.0
   get_it: ^9.2.1

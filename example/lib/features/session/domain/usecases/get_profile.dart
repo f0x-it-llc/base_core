@@ -1,4 +1,4 @@
-import 'package:base_core/base_core.dart';
+import 'package:clean_signals/clean_signals.dart';
 
 import '../entities/user_profile.dart';
 import '../repositories/profile_repository.dart';

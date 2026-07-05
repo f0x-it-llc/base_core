@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:base_core/base_core.dart';
+import 'package:clean_signals/clean_signals.dart';
 import 'package:flutter/material.dart';
 
 import '../failures/app_failure.dart';

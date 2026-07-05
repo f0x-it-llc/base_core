@@ -1,7 +1,7 @@
-# Team Directory — base_core sample app
+# Team Directory — clean_signals sample app
 
 A small but complete Flutter app demonstrating how a large-scale application
-implements clean architecture on top of **base_core v2 + signals + get_it**.
+implements clean architecture on top of **clean_signals v2 + signals + get_it**.
 
 It shows a live team directory: a searchable member list with real-time
 online presence, a detail screen, and a rename flow with domain validation —

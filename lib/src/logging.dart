@@ -1,16 +1,16 @@
 import 'package:logger/logger.dart';
 
-/// Process-wide logger shared by base_core classes.
+/// Process-wide logger shared by clean_signals classes.
 ///
 /// Register your app's configured [Logger] once at startup:
 ///
 /// ```dart
-/// BaseCoreLogger.instance.register(Logger(level: Level.debug));
+/// CleanSignalsLogger.instance.register(Logger(level: Level.debug));
 /// ```
-class BaseCoreLogger {
-  BaseCoreLogger._();
+class CleanSignalsLogger {
+  CleanSignalsLogger._();
 
-  static final BaseCoreLogger instance = BaseCoreLogger._();
+  static final CleanSignalsLogger instance = CleanSignalsLogger._();
 
   Logger logger = Logger(
     level: Level.warning,

@@ -1,4 +1,4 @@
-import 'package:base_core/base_core.dart';
+import 'package:clean_signals/clean_signals.dart';
 import 'package:test/test.dart';
 
 class NetworkFailure extends Failure {

@@ -1,6 +1,6 @@
-# base_core — instructions for agents working on THIS repo
+# clean_signals — instructions for agents working on THIS repo
 
-base_core is a lightweight use-case/controller framework on top of
+clean_signals is a lightweight use-case/controller framework on top of
 [signals](https://pub.dev/packages/signals). Pure Dart core in `lib/`,
 full clean-architecture Flutter sample in `example/`.
 
@@ -17,7 +17,7 @@ All four must pass with zero issues before any change is done.
 
 - `lib/src/` — `result.dart`, `failure.dart`, `usecase.dart`,
   `controller.dart`, `activity.dart`, `retry.dart`, `logging.dart`.
-  Everything is exported through `lib/base_core.dart`.
+  Everything is exported through `lib/clean_signals.dart`.
 - `example/` — the **reference implementation** of the architecture we tell
   downstream projects to follow (see `templates/AGENTS.md`). It must stay
   exemplary: feature slices (`team/`, `session/`), strict layer boundaries,

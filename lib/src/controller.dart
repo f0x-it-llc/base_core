@@ -42,7 +42,7 @@ abstract class Controller {
   }
 
   @protected
-  Logger get logger => BaseCoreLogger.instance.logger;
+  Logger get logger => CleanSignalsLogger.instance.logger;
 
   final ActivityTracker _activity = ActivityTracker();
   final StreamController<Failure> _failures = StreamController.broadcast();

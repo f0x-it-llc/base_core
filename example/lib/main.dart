@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:base_core/base_core.dart';
+import 'package:clean_signals/clean_signals.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
@@ -10,7 +10,7 @@ import 'features/session/presentation/controllers/session_controller.dart';
 import 'features/team/presentation/pages/members_page.dart';
 
 void main() {
-  BaseCoreLogger.instance.register(
+  CleanSignalsLogger.instance.register(
     Logger(level: Level.debug, printer: SimplePrinter()),
   );
   configureDependencies();

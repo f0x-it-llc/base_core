@@ -41,9 +41,9 @@ const noParams = NoParams();
 /// }
 /// ```
 abstract class UseCase<P, R> {
-  /// Logger shared through [BaseCoreLogger]; available to subclasses.
+  /// Logger shared through [CleanSignalsLogger]; available to subclasses.
   @protected
-  Logger get logger => BaseCoreLogger.instance.logger;
+  Logger get logger => CleanSignalsLogger.instance.logger;
 
   /// The business logic. Prefer calling the use case via [call] so errors
   /// are converted to [Failed] results.
@@ -78,9 +78,9 @@ abstract class UseCase<P, R> {
 /// survives the error (e.g. a broadcast stream) it keeps emitting; if the
 /// error terminated the source, the [Failed] event is the last one.
 abstract class StreamUseCase<P, R> {
-  /// Logger shared through [BaseCoreLogger]; available to subclasses.
+  /// Logger shared through [CleanSignalsLogger]; available to subclasses.
   @protected
-  Logger get logger => BaseCoreLogger.instance.logger;
+  Logger get logger => CleanSignalsLogger.instance.logger;
 
   /// The business logic. Prefer consuming the use case via [call].
   @protected

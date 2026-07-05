@@ -1,4 +1,4 @@
-# Base Core
+# clean_signals
 
 A lightweight use-case and controller framework for [signals](https://pub.dev/packages/signals)-based Flutter and Dart applications.
 
@@ -15,7 +15,7 @@ Typed results, sealed failures, ref-counted loading state and declarative retrie
 
 ```yaml
 dependencies:
-  base_core: ^2.0.0
+  clean_signals: ^2.0.0
   signals: ^7.0.0
 ```
 
@@ -153,7 +153,7 @@ See [`example/`](example/) for a complete clean-architecture Flutter app: entiti
 
 ## AI agents
 
-Building a project on base_core with AI agents (Claude Code, Cursor, Codex, ...)?
+Building a project on clean_signals with AI agents (Claude Code, Cursor, Codex, ...)?
 Copy [`templates/AGENTS.md`](templates/AGENTS.md) into your project root as
 `AGENTS.md` / `CLAUDE.md` — it encodes the strict clean-architecture rules of
 the example app in agent-enforceable form.

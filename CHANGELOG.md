@@ -2,6 +2,9 @@
 
 ## 2.0.0
 
+**Renamed from `base_core` to `clean_signals`** (the original name was taken
+on pub.dev). Update imports to `package:clean_signals/clean_signals.dart`.
+
 Complete rewrite. The package is now pure Dart (no Flutter SDK dependency)
 and built on [signals](https://pub.dev/packages/signals) instead of rxdart;
 dartz has been removed entirely.

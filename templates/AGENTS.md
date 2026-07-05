@@ -1,12 +1,12 @@
-# Agent Instructions — base_core Clean Architecture
+# Agent Instructions — clean_signals Clean Architecture
 
 > Copy this file into the root of every project built on
-> [base_core](https://github.com/f0x-it-llc/base_core) as `AGENTS.md` (and/or
+> [clean_signals](https://github.com/f0x-it-llc/clean_signals) as `AGENTS.md` (and/or
 > `CLAUDE.md` for Claude Code). Fill in the `<project-specific>` sections at
 > the bottom. The reference implementation for every rule here is the
-> base_core `example/` app (Team Directory) — when in doubt, imitate it.
+> clean_signals `example/` app (Team Directory) — when in doubt, imitate it.
 
-This project uses **base_core v2 + signals + get_it** with strict,
+This project uses **clean_signals v2 + signals + get_it** with strict,
 feature-sliced clean architecture. These rules are not suggestions; a change
 that violates them is wrong even if it compiles and passes tests.
 
@@ -22,9 +22,9 @@ presentation ──▶ domain ◀── data
 
 | Layer | MAY import | MUST NOT import |
 | --- | --- | --- |
-| `domain/` | base_core, other files in the same feature's domain, `core/failures` | Flutter, signals, get_it, `data/`, `presentation/`, any package that does I/O |
-| `data/` | base_core, own feature's `domain/`, `core/` (failures, network), transport packages (http, grpc, drift, shared_preferences, ...) | Flutter widgets, signals, `presentation/`, other features' `data/` |
-| `presentation/` | base_core, signals, Flutter, get_it (lookup only), own feature's `domain/`, `core/`, other features' `presentation/` widgets | any `data/` file, transport packages, DTOs |
+| `domain/` | clean_signals, other files in the same feature's domain, `core/failures` | Flutter, signals, get_it, `data/`, `presentation/`, any package that does I/O |
+| `data/` | clean_signals, own feature's `domain/`, `core/` (failures, network), transport packages (http, grpc, drift, shared_preferences, ...) | Flutter widgets, signals, `presentation/`, other features' `data/` |
+| `presentation/` | clean_signals, signals, Flutter, get_it (lookup only), own feature's `domain/`, `core/`, other features' `presentation/` widgets | any `data/` file, transport packages, DTOs |
 
 Cross-feature communication happens through presentation (controllers/widgets)
 or through a domain contract registered in DI — never by importing another
