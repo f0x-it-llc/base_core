@@ -4,7 +4,7 @@ description: >-
   and Dart applications. Typed results, sealed failures, ref-counted activity
   tracking and declarative retries — without rxdart or dartz.
 version: 2.0.0
-homepage:
+homepage: https://github.com/f0x-it-llc/base_core
 
 environment:
   sdk: ^3.5.0
