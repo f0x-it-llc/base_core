@@ -1,20 +1,19 @@
 name: base_core
-description: A new Flutter project.
-version: 0.5.0
+description: >-
+  A lightweight use-case and controller framework for signals-based Flutter
+  and Dart applications. Typed results, sealed failures, ref-counted activity
+  tracking and declarative retries — without rxdart or dartz.
+version: 2.0.0
 homepage:
 
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ^3.5.0
 
 dependencies:
-  flutter:
-    sdk: flutter
-  dartz: ^0.10.1
-  rxdart: ">=0.27.1 <0.28.0"
+  signals: ^7.0.0
   logger: ^2.5.0
+  meta: ^1.15.0
 
 dev_dependencies:
-  flutter_test:
-    sdk: flutter
-
-flutter:
+  test: ^1.25.0
+  lints: ^6.0.0

@@ -1,40 +1,82 @@
 import 'package:base_core/base_core.dart';
-import 'package:dartz/dartz.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
-class NullValueFailure extends Failure {}
+class NetworkFailure extends Failure {
+  const NetworkFailure([String? message]) : super(message: message);
 
-class ParsingFailure extends Failure {}
-
-class TestUseCase extends UseCase<String?, int> {
   @override
-  Future<Either<Failure, int>> execute(String? params) async {
-    if (params == null) {
-      return left(NullValueFailure());
-    }
-    try {
-      final res = await Future.delayed(
-        Duration(milliseconds: 500),
-        () => int.parse(params),
-      );
+  bool get isRetryable => true;
+}
 
-      return right(res);
-    } catch (e) {
-      return left(ParsingFailure());
+class Doubler extends UseCase<int, int> {
+  @override
+  Future<Result<int>> execute(int params) async => Success(params * 2);
+}
+
+class ThrowsFailure extends UseCase<NoParams, int> {
+  @override
+  Future<Result<int>> execute(NoParams params) async =>
+      throw const NetworkFailure('offline');
+}
+
+class ThrowsError extends UseCase<NoParams, int> {
+  @override
+  Future<Result<int>> execute(NoParams params) async =>
+      throw FormatException('bad payload');
+}
+
+class CountingStream extends StreamUseCase<int, int> {
+  @override
+  Stream<Result<int>> execute(int params) async* {
+    for (var i = 1; i <= params; i++) {
+      yield Success(i);
     }
   }
 }
 
+class FailingStream extends StreamUseCase<NoParams, int> {
+  @override
+  Stream<Result<int>> execute(NoParams params) async* {
+    yield const Success(1);
+    throw StateError('stream died');
+  }
+}
+
 void main() {
-  test('Test usecase', () async {
-    final useCase = TestUseCase();
-    expect(await useCase.result(null, (e) => e.isLeft()), true);
+  group('UseCase.call', () {
+    test('returns the result of execute', () async {
+      expect(await Doubler()(21), const Success<int>(42));
+    });
 
-    expect(await useCase.result('56', (e) => e.fold((_) => 0, (r) => r)), 56);
+    test('converts a thrown Failure into Failed with the same failure',
+        () async {
+      final result = await ThrowsFailure()(noParams);
+      expect(result.failureOrNull, isA<NetworkFailure>());
+      expect(result.failureOrNull!.message, 'offline');
+    });
 
-    final failure =
-        await useCase.result('params', (e) => e.fold((l) => l, (_) => 0));
+    test('converts an unexpected error into UnexpectedFailure', () async {
+      final result = await ThrowsError()(noParams);
+      final failure = result.failureOrNull;
+      expect(failure, isA<UnexpectedFailure>());
+      expect(failure!.cause, isA<FormatException>());
+      expect(failure.isRetryable, isFalse);
+    });
+  });
 
-    expect(failure.runtimeType, ParsingFailure);
+  group('StreamUseCase.call', () {
+    test('forwards results', () async {
+      expect(
+        await CountingStream()(3).toList(),
+        const [Success<int>(1), Success<int>(2), Success<int>(3)],
+      );
+    });
+
+    test('converts stream errors into a trailing Failed event', () async {
+      final events = await FailingStream()(noParams).toList();
+      expect(events.first, const Success<int>(1));
+      expect(events.last.failureOrNull, isA<UnexpectedFailure>());
+      expect(events.last.failureOrNull!.cause, isA<StateError>());
+    });
   });
 }

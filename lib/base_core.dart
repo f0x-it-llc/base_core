@@ -1,11 +1,19 @@
-library base_core;
+/// A lightweight use-case and controller framework for signals-based Flutter
+/// and Dart applications.
+///
+/// - [Result] / [Success] / [Failed] — typed operation outcomes
+/// - [Failure] — sealed-hierarchy-friendly domain failures
+/// - [UseCase] / [StreamUseCase] — guarded business-logic units
+/// - [Controller] — signals-based view-model base with activity tracking,
+///   failure routing, retries and lifecycle cleanup
+/// - [ActivityTracker] — ref-counted loading state
+/// - [RetryPolicy] — per-call declarative retries
+library;
 
-export 'src/activity_indicator.dart';
-export 'src/base_bloc.dart';
-export 'src/data_manager.dart';
+export 'src/activity.dart';
+export 'src/controller.dart';
 export 'src/failure.dart';
-export 'src/match.dart';
-export 'src/register_logger.dart';
-export 'src/use_case_generator.dart';
+export 'src/logging.dart';
+export 'src/result.dart';
+export 'src/retry.dart';
 export 'src/usecase.dart';
-export 'src/value_stream_builder.dart';

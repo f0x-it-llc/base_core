@@ -1,231 +1,182 @@
 # Base Core
 
-Yet another state management solution for Flutter applications.
+A lightweight use-case and controller framework for [signals](https://pub.dev/packages/signals)-based Flutter and Dart applications.
 
-## About
+Typed results, sealed failures, ref-counted loading state and declarative retries — in a few hundred lines of pure Dart, with no rxdart, no dartz, and no Flutter dependency in the core.
 
-Base Core is an opinionated state management solution designed for large-scale Flutter applications. It provides a collection of utility classes that work together seamlessly to manage application state, handle use cases, and implement the BLoC (Business Logic Component) pattern.
+## Philosophy
 
-*Note: This library heavily depends on [dartz](https://pub.dev/packages/dartz) and [rxdart](https://pub.dev/packages/rxdart)*
-
-## Key Features
-
-- BLoC pattern implementation
-- Reactive state management
-- Use case execution framework
-- Error handling and retry mechanisms
-- Activity tracking
-- Structured logging
-
-## Core Components
-
-### BaseBloc
-A foundational implementation of the BLoC pattern that provides:
-- Automatic subscription management
-- Built-in logging
-- Disposable resources cleanup
-
-### DataManager
-A powerful state management solution that offers:
-- Centralized state management
-- Use case execution
-- Automatic retry mechanism for failed operations
-- Activity indication
-- Error handling
-- Stream-based state updates
-
-### UseCase
-Abstract classes for implementing business logic:
-- `UseCase<P, R>`: For single-execution use cases
-- `StreamingUseCase<P, R>`: For continuous data streams
-- `DataManagerUseCase<P, R>`: Specialized use cases for DataManager
+- **Business logic lives in use cases.** Small, testable units that always return a `Result` — never throw across a layer boundary.
+- **State is signals.** Controllers own fine-grained `signal`/`computed` state; widgets rebuild only for what they read.
+- **Failures are data.** A sealed `Failure` hierarchy your UI can exhaustively `switch` over, with one broadcast stream per controller for global handling (snackbars, reporting).
+- **No magic registry.** v1's type-keyed use-case registry is gone; controllers call use cases as plain typed fields. The compiler is the registry.
 
 ## Installation
 
-Add this to your package's `pubspec.yaml` file:
-
 ```yaml
 dependencies:
-  base_core: ^1.0.0
+  base_core: ^2.0.0
+  signals: ^7.0.0
 ```
 
-## Usage
+## Core concepts
 
-### 1. Creating a Use Case
+### Failure
+
+Model your domain's failure modes as a sealed hierarchy. `isRetryable` feeds the default retry policy.
 
 ```dart
-class GetUserProfile extends UseCase<String, UserProfile> {
-  final UserRepository userRepository;
+sealed class AppFailure extends Failure {
+  const AppFailure({super.message, super.cause, super.stackTrace});
+}
 
-  GetUserProfile(this.userRepository);
+final class NetworkFailure extends AppFailure {
+  const NetworkFailure({super.message, super.cause, super.stackTrace});
 
   @override
-  Future<Either<Failure, UserProfile>> execute(String userId) async {
-    try {
-      final profile = await userRepository.getProfile(userId);
-      return right(profile);
-    } catch (e) {
-      return left(UnexpectedFailure(e.toString()));
-    }
-  }
+  bool get isRetryable => true;
 }
 ```
 
-### 2. Setting up a DataManager
+`Failure` implements `Exception`, so lower layers may `throw` one — the use-case wrapper converts it into a result.
+
+### Result
+
+A sealed union of `Success<T>` and `Failed<T>` with the usual combinators (`fold`, `map`, `flatMap`, `getOrElse`) and exhaustive pattern matching:
 
 ```dart
-class UserState {
-  final UserProfile? profile;
-  final bool isLoggedIn;
-  final List<User> friends;
-  // Add other state properties as needed
-}
-
-class UserUseCaseGenerator extends UseCaseGenerator<UserState> {
-    UserUseCaseGenerator() {
-        final userRepository = UserRepository();
-        addUseCase(GetUserProfile(userRepository));
-        addUseCase(UpdateUserUseCase(userRepository));
-        addUseCaseWithMapFn(GetUserAges(userRepository), GetUserAges.mapToUser);
-        addStreamingUseCase(StreamUserAgeUseCase(userRepository));
-        addUseCaseWithMapFn(RetryableUseCase(userRepository), (u, _) => u);
-    }
-}
-
-class UserDataManager extends DataManager<UserState> {
-  UserDataManager() : super(UserUseCaseGenerator());
-
-  void getUserProfile(String userId) {
-    runUseCase<GetUserProfile, String>(userId);
-  }
-
-  void updateUser(UserProfile profile) {
-    runUseCase<UpdateUserUseCase, UserProfile>(profile);
-  }
-
-  void getUsersAges() {
-    runUseCase<GetUserAges, void>(null);
-  }
-
-  void registerAgeStream(TestingStreamUserAgeUseCaseParams params) {
-    registerStreamingUseCase<StreamUserAgeUseCase, TestingStreamUserAgeUseCaseParams>(params);
-  }
-
-  void retryableUseCase() {
-    runUseCase<RetryableUseCase, void>(null);
-  }
-}
-
-```
-
-### 3. Using BLoC Pattern
-
-```dart
-class UserBloc extends BaseBloc {
-  final UserDataManager _dataManager;
-  
-  UserBloc(this._dataManager);
-  
-  void loadUserProfile(String userId) {
-    _dataManager.getUserProfile(userId);
-  }
-
-  void updateUser(UserProfile profile) {
-    _dataManager.updateUser(profile);
-  }
-
-  Stream<bool> get isLoading => _dataManager.isLoading;
-
-  Stream<Failure> get onFailure => _dataManager.onFailure;
-  
-  Stream<UserState> get state => _dataManager.rx;
+switch (result) {
+  case Success(:final value): render(value);
+  case Failed(:final failure): report(failure);
 }
 ```
 
-### 4. Implementing in UI
+`result.toAsyncState()` bridges into signals' `AsyncState` for UI consumption, and `asyncStateSignal<T>()` creates a `Signal<AsyncState<T>>` seeded with loading.
+
+### UseCase
 
 ```dart
-class UserProfileScreen extends StatelessWidget {
+class GetMembers extends UseCase<NoParams, List<Member>> {
+  GetMembers(this._repository);
+
+  final MemberRepository _repository;
+
   @override
-  Widget build(BuildContext context) {
-    final bloc = BlocProvider.of<UserBloc>(context);
-    
-    return ValueStreamBuilder<UserState>(
-      stream: bloc.state,
-      builder: (context, snapshot) {
-        final state = snapshot.data;
-        return // Your UI implementation
-      },
-    );
-  }
+  Future<Result<List<Member>>> execute(NoParams params) async =>
+      Success(await _repository.getMembers());
 }
 ```
 
-## Advanced Features
+Calling a use case (`await getMembers(noParams)`) is guarded: thrown `Failure`s become `Failed`, anything else becomes `Failed(UnexpectedFailure(...))`. Callers always get a `Result`.
 
-### Activity Tracking
-Monitor loading states across your application:
+`StreamUseCase<P, R>` is the streaming variant — error events on the source stream are converted to `Failed` events instead of crashing the subscription.
+
+Use Dart 3 records for multi-value params (this is what dartz's `Tuple2` used to do):
 
 ```dart
-dataManager.isLoading.listen((isLoading) {
-  // Handle loading state
+typedef UpdateNameParams = ({String id, String name});
+
+class UpdateMemberName extends UseCase<UpdateNameParams, Member> { ... }
+```
+
+### Controller
+
+The presentation-layer base class. Owns signals, executes use cases, cleans up after itself.
+
+```dart
+class MembersController extends Controller {
+  MembersController(this._getMembers, WatchOnlinePresence watchPresence) {
+    watch(watchPresence, noParams, onData: _applyPresence);
+    onDispose(members.dispose);
+  }
+
+  final GetMembers _getMembers;
+
+  final members = asyncStateSignal<List<Member>>();
+  final query = signal('');
+  late final filtered = computed(() => /* derive from members + query */);
+
+  Future<void> load() => runInto(
+        _getMembers,
+        noParams,
+        into: members,
+        retry: const RetryPolicy(maxAttempts: 3),
+      );
+}
+```
+
+What the base class provides:
+
+| Member | Purpose |
+| --- | --- |
+| `run(useCase, params, ...)` | Execute, track activity, route failures, apply retries; returns the `Result`. |
+| `runInto(useCase, params, into: signal)` | Same, and drives a `Signal<AsyncState<T>>` through loading → data/error. Existing data stays visible during reloads (`AsyncDataReloading`). |
+| `watch(streamUseCase, params, onData: ...)` | Subscribe to a stream use case; auto-cancelled on dispose. |
+| `isLoading` | `ReadonlySignal<bool>` — ref-counted across overlapping operations. |
+| `failures` | Broadcast `Stream<Failure>` of every unhandled failure (after retries). |
+| `autoEffect(fn)` | A signals `effect` cleaned up on dispose. |
+| `onDispose(fn)` | Register any cleanup; run in reverse order by `dispose()`. |
+
+### RetryPolicy
+
+Per-call and self-contained — no shared counters:
+
+```dart
+run(getMembers, noParams,
+    retry: const RetryPolicy(
+      maxAttempts: 3,
+      delay: Duration(milliseconds: 300),
+      backoffFactor: 2, // 300ms, then 600ms
+    ));
+```
+
+Only failures where `shouldRetry` returns true (defaults to `failure.isRetryable`) are retried, and only the final failure is emitted on `failures`.
+
+## UI integration
+
+Widgets read signals inside `SignalBuilder` (signals 7+):
+
+```dart
+SignalBuilder(builder: (_) {
+  final state = controller.members.value;
+  return switch (state) {
+    AsyncData(:final value) => MemberList(value),
+    AsyncError(:final error) => ErrorView(error),
+    _ => const CircularProgressIndicator(),
+  };
+})
+```
+
+> Read every signal you depend on *inside* the `SignalBuilder`'s builder. Reads inside nested widgets' `build` methods are not tracked.
+
+See [`example/`](example/) for a complete clean-architecture Flutter app: entities → repositories → use cases → controllers → pages, with DI via get_it, live stream updates, retryable failures and widget tests.
+
+## Testing
+
+Everything is pure Dart:
+
+```dart
+test('retries flaky calls', () async {
+  final controller = MembersController(FlakyGetMembers(), FakePresence());
+  await controller.load();
+  expect(controller.members.value, isA<AsyncData<List<Member>>>());
 });
 ```
 
-### Error Handling
-Handle failures and errors gracefully:
+## Migrating from 1.x
 
-```dart
-dataManager.onFailure.listen((failure) {
-  // Handle failure
-});
-```
+| v1 | v2 |
+| --- | --- |
+| `Either<Failure, R>` (dartz) | `Result<R>` (`Success` / `Failed`) |
+| `Tuple2` (dartz) | Dart 3 records |
+| `DataManager<D>` + `UseCaseGenerator` | `Controller` with plain use-case fields |
+| `runUseCase<U, P>(params)` type registry | direct call: `run(useCase, params)` |
+| `BehaviorSubject` state + `ValueStreamBuilder` | `signal` / `computed` + `SignalBuilder` |
+| `ActivityIndicator` (rxdart) | `ActivityTracker` / `Controller.isLoading` (signals) |
+| `RetryableFailure` + global retry loop | `Failure.isRetryable` + per-call `RetryPolicy` |
+| `BlocProvider` / `MultiBlocProvider` | bring your own DI (e.g. get_it) |
+| `onFailure` PublishSubject | `Controller.failures` broadcast stream |
 
-### Automatic Retries
-The DataManager automatically handles retryable failures:
+## License
 
-```dart
-class NetworkFailure extends RetryableFailure {
-    dynamic params; 
-    NetworkFailure(this.params, Type runtimeType) : super(
-        params: params,
-        useCase: runtimeType,
-        delay: Duration(milliseconds: 500),
-    );
-}
-
-class GetUserProfile extends UseCase<String, UserProfile> {
-  final UserRepository userRepository;
-
-  GetUserProfile(this.userRepository);
-
-  @override
-  Future<Either<Failure, UserProfile>> execute(String userId) async {
-    try {
-      final profile = await userRepository.getProfile(userId);
-      return right(profile);
-    } catch (e) {
-        // if the error code is 500, we want to retry the use case
-        if (e.code == 500) {
-            return left(NetworkFailure(userId, this.runtimeType));
-        }
-      return left(UnexpectedFailure(e.toString()));
-    }
-  }
-}
-```
-
-## Best Practices
-
-1. Keep use cases focused on single responsibilities
-2. Implement proper error handling in use cases
-3. Use appropriate failure types
-4. Dispose of resources properly
-5. Utilize the built-in logging system for debugging
-
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-
+See [LICENSE](LICENSE).

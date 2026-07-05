@@ -1,83 +1,127 @@
 import 'dart:async';
 
-import 'package:base_core/base_core.dart';
-import 'package:dartz/dartz.dart';
-import 'package:flutter/foundation.dart';
-import 'package:rxdart/rxdart.dart';
+import 'package:logger/logger.dart';
+import 'package:meta/meta.dart';
 
-abstract class StreamingUseCase<P, R> {
-  @protected
-  late Logger logger;
+import 'failure.dart';
+import 'logging.dart';
+import 'result.dart';
 
-  StreamingUseCase() {
-    logger = BaseCoreLogger.instance.logger;
-  }
-
-  Either<Failure, R> onError(Object object, StackTrace stackTrace);
-
-  Stream<Either<Failure, R>> call(P param) =>
-      run(param).onErrorReturnWith(onError);
-
-  Stream<Either<Failure, R>> run(P param);
+/// Parameter type for use cases that take no input.
+///
+/// ```dart
+/// class GetUsers extends UseCase<NoParams, List<User>> { ... }
+///
+/// final result = await getUsers(noParams);
+/// ```
+final class NoParams {
+  const NoParams();
 }
 
+const noParams = NoParams();
+
+/// A single unit of business logic producing one [Result].
+///
+/// Implement [execute] with the happy path. Domain failures can be returned
+/// (`return Failed(NotFoundFailure(...))`) or thrown (`throw
+/// NetworkFailure(...)`) — [call] catches thrown [Failure]s and converts any
+/// other uncaught error into an [UnexpectedFailure], so callers always get a
+/// [Result] and never an exception.
+///
+/// ```dart
+/// class GetUser extends UseCase<String, User> {
+///   GetUser(this._repository);
+///
+///   final UserRepository _repository;
+///
+///   @override
+///   Future<Result<User>> execute(String userId) async {
+///     return Success(await _repository.getUser(userId));
+///   }
+/// }
+/// ```
 abstract class UseCase<P, R> {
+  /// Logger shared through [BaseCoreLogger]; available to subclasses.
   @protected
-  late Logger logger;
+  Logger get logger => BaseCoreLogger.instance.logger;
 
-  UseCase() {
-    logger = BaseCoreLogger.instance.logger;
-  }
+  /// The business logic. Prefer calling the use case via [call] so errors
+  /// are converted to [Failed] results.
+  @protected
+  Future<Result<R>> execute(P params);
 
-  Future<Either<Failure, R>> execute(P params);
-
-  Stream<Either<Failure, R>> call(P params) => execute(params).asStream();
-
-  Trampoline<Stream<Either<Failure, R>>> tStream(P params) =>
-      treturn(call(params));
-
-  Future<B> result<B>(P params, B Function(Either<Failure, R>) onResult) async {
-    final result = await execute(params);
-    return onResult(result);
+  /// Executes the use case, guaranteeing a [Result] is returned.
+  Future<Result<R>> call(P params) async {
+    try {
+      return await execute(params);
+    } on Failure catch (failure) {
+      return Failed(failure);
+    } catch (error, stackTrace) {
+      logger.e(
+        'Unhandled error in $runtimeType',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Failed(UnexpectedFailure(
+        message: 'Unhandled error in $runtimeType',
+        cause: error,
+        stackTrace: stackTrace,
+      ));
+    }
   }
 }
 
-// abstract class RetryableUseCase<P, R> extends UseCase<P, R> {
-//   int retries = 0;
-//   int maxRetries = 3;
-//   Duration delay = Duration.zero;
-// }
+/// A unit of business logic producing a stream of [Result]s.
+///
+/// Like [UseCase], errors raised by the underlying stream are converted into
+/// [Failed] events instead of propagating as stream errors. If the source
+/// survives the error (e.g. a broadcast stream) it keeps emitting; if the
+/// error terminated the source, the [Failed] event is the last one.
+abstract class StreamUseCase<P, R> {
+  /// Logger shared through [BaseCoreLogger]; available to subclasses.
+  @protected
+  Logger get logger => BaseCoreLogger.instance.logger;
 
-// A Usecase to be use inside a data manager
+  /// The business logic. Prefer consuming the use case via [call].
+  @protected
+  Stream<Result<R>> execute(P params);
 
-abstract class DataManagerUseCase<P, R> extends UseCase<Tuple2<P, R>, R> {
-  late Tuple2<P, R> _params;
-
-  @mustCallSuper
-  void params(Tuple2<P, R> params) {
-    _params = params;
+  /// Subscribes to the use case, guaranteeing an error-free result stream.
+  ///
+  /// Implemented with a transformer rather than an `async*` wrapper so that
+  /// cancelling the subscription propagates to the source immediately (an
+  /// `async*` generator blocked on a slow source would delay cancellation
+  /// until the source's next event).
+  Stream<Result<R>> call(P params) {
+    final Stream<Result<R>> source;
+    try {
+      source = execute(params);
+    } on Failure catch (failure) {
+      return Stream.value(Failed(failure));
+    } catch (error, stackTrace) {
+      return Stream.value(Failed(_unexpected(error, stackTrace)));
+    }
+    return source.transform(
+      StreamTransformer.fromHandlers(
+        handleError: (error, stackTrace, sink) {
+          sink.add(Failed(
+            error is Failure ? error : _unexpected(error, stackTrace),
+          ));
+        },
+      ),
+    );
   }
 
-  P get param => _params.value1;
-  R get value => _params.value2;
-}
-
-// abstract class DataManagerRetryableUseCase<P, R>
-//     extends DataManagerUseCase<P, R> {
-//   int retries = 0;
-//   int maxRetries = 3;
-//   Duration delay = Duration.zero;
-// }
-
-abstract class DataManagerStreamingUseCase<P, R>
-    extends StreamingUseCase<Tuple2<P, BehaviorSubject<R>>, R> {
-  late Tuple2<P, BehaviorSubject<R>> _params;
-
-  @mustCallSuper
-  void params(Tuple2<P, BehaviorSubject<R>> params) {
-    _params = params;
+  Failure _unexpected(Object error, StackTrace stackTrace) {
+    logger.e(
+      'Unhandled error in $runtimeType',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return UnexpectedFailure(
+      message: 'Unhandled error in $runtimeType',
+      cause: error,
+      stackTrace: stackTrace,
+    );
   }
-
-  P get param => _params.value1;
-  BehaviorSubject<R> get value => _params.value2;
 }
