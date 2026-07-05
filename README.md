@@ -151,6 +151,13 @@ SignalBuilder(builder: (_) {
 
 See [`example/`](example/) for a complete clean-architecture Flutter app: entities → repositories → use cases → controllers → pages, with DI via get_it, live stream updates, retryable failures and widget tests.
 
+## AI agents
+
+Building a project on base_core with AI agents (Claude Code, Cursor, Codex, ...)?
+Copy [`templates/AGENTS.md`](templates/AGENTS.md) into your project root as
+`AGENTS.md` / `CLAUDE.md` — it encodes the strict clean-architecture rules of
+the example app in agent-enforceable form.
+
 ## Testing
 
 Everything is pure Dart:
