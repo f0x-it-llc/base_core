@@ -90,6 +90,10 @@ lib/features/<feature>/
   Never implement retry loops by hand.
 - Register every owned signal and subscription for cleanup:
   `onDispose(signal.dispose)`, `autoEffect(...)`, `watch(...)` (auto-cancels).
+- A plain signal write that follows an `await` must be guarded with
+  `if (isDisposed) return;` — a screen-scoped controller can be disposed
+  while the operation is in flight, and an unguarded write then throws.
+  (`runInto`/`watch` guard their own writes; this is only for raw writes.)
 - Controllers never import Flutter and never touch `BuildContext`.
   Navigation and snackbars belong to pages; controllers return values/expose
   signals the page reacts to.

@@ -21,7 +21,8 @@ import 'usecase.dart';
 ///   logging, analytics),
 /// - per-call [RetryPolicy] retries,
 /// - lifecycle cleanup: everything registered with [onDispose], created with
-///   [autoEffect], or subscribed with [watch] is torn down by [dispose].
+///   [autoEffect], or subscribed with [watch] is torn down by [dispose];
+///   [isDisposed] lets subclasses guard their own post-`await` signal writes.
 ///
 /// ```dart
 /// class UsersController extends Controller {
@@ -56,6 +57,23 @@ abstract class Controller {
   /// are exhausted). Subscribe once near the UI root of the feature to show
   /// snackbars or report errors.
   Stream<Failure> get failures => _failures.stream;
+
+  /// Whether [dispose] has run.
+  ///
+  /// [runInto] and [watch] already skip their own writes after disposal, but
+  /// a controller often owns plain signals it updates after an `await`. If
+  /// the controller is disposed while that operation is in flight (e.g. the
+  /// screen was popped), the write would throw. Guard such sites:
+  ///
+  /// ```dart
+  /// Future<void> loadServers() async {
+  ///   final result = await run(_getServers, noParams);
+  ///   if (isDisposed) return;
+  ///   servers.value = result.getOrElse((_) => const []);
+  /// }
+  /// ```
+  @protected
+  bool get isDisposed => _disposed;
 
   /// Registers [cleanup] to run when the controller is disposed.
   /// Cleanups run in reverse registration order.

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- `Controller.isDisposed` — protected getter exposing the controller's
+  disposal state, so subclasses can guard plain signal writes that follow an
+  `await` (`if (isDisposed) return;`) without re-implementing their own
+  `_disposed` flag. `runInto` and `watch` already guard their own writes;
+  this covers state that doesn't fit the `AsyncState` shape ([#6](https://github.com/f0x-it-llc/clean_signals/issues/6)).
+
+### Fixed
+
+- `ActivityTracker.track` no longer writes to its disposed counter signal
+  when a tracked operation is still in flight during `dispose()` — an
+  in-flight `run(...)` used to throw `SignalsWriteAfterDisposeError` from
+  its `finally` block when the controller was disposed mid-operation.
+
 ## 2.0.0
 
 **Renamed from `base_core` to `clean_signals`** (the original name was taken

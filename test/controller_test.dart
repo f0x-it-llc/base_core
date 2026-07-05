@@ -77,6 +77,8 @@ class TestController extends Controller {
       watch(useCase, params, onData: onData);
 
   void addCleanup(void Function() fn) => onDispose(fn);
+
+  bool get disposed => isDisposed;
 }
 
 void main() {
@@ -282,6 +284,33 @@ void main() {
       controller.dispose();
       controller.dispose();
       expect(order, ['second', 'first']);
+    });
+
+    test('isDisposed reflects lifecycle', () {
+      final controller = TestController();
+      expect(controller.disposed, isFalse);
+
+      controller.dispose();
+      expect(controller.disposed, isTrue);
+    });
+
+    test('isDisposed guards a raw signal write after an await', () async {
+      final controller = TestController();
+      final gate = Completer<void>();
+      final value = signal<int?>(null);
+
+      Future<void> load() async {
+        final result = await controller.exec(SlowUseCase(gate), noParams);
+        if (controller.disposed) return;
+        value.value = result.getOrElse((_) => 0);
+      }
+
+      final pending = load();
+      controller.dispose();
+      gate.complete();
+      await pending;
+
+      expect(value.value, isNull, reason: 'write skipped after dispose');
     });
   });
 }
